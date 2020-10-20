@@ -59,8 +59,12 @@ public class Knob extends Region {
         addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> updateRotationWithMouseEvent(e));
         addEventHandler(KeyEvent.KEY_PRESSED, e -> {
             switch (e.getCode()) {
-                case UP -> rotationProperty().set(rotationProperty().get() - (isSnapToTicks() ? tickSpacing.get() : 1));
-                case DOWN -> rotationProperty().set(rotationProperty().get() + (isSnapToTicks() ? tickSpacing.get() : 1));
+                case UP:
+                    rotationProperty().set(rotationProperty().get() - (isSnapToTicks() ? tickSpacing.get() : 1));
+                    break;
+                case DOWN:
+                    rotationProperty().set(rotationProperty().get() + (isSnapToTicks() ? tickSpacing.get() : 1));
+                    break;
 
             }
         });
