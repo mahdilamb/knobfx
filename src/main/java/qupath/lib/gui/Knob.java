@@ -1,6 +1,5 @@
 package qupath.lib.gui;
 
-import com.sun.javafx.geom.Vec3d;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleBooleanProperty;
@@ -108,9 +107,8 @@ public class Knob extends Region {
         if (isDisabled()) {
             return;
         }
-        final Vec3d vector = new Vec3d(e.getX() - center[0], e.getY() - center[1], 0);
-        vector.normalize();
-        final double[] currentVector = new double[]{vector.x, vector.y};
+
+        final double[] currentVector = normalize(e.getX() - center[0], e.getY() - center[1]);
         final double angle = Math.atan2(currentVector[0], -currentVector[1]);
         rotationProperty.set(Math.toDegrees(angle >= 0 ? angle : Math.PI + Math.PI + angle));// atan2 of dot product and determinant of current vector verses up (0,-1). As x of up vector is 0, can simplify
     }
@@ -140,6 +138,48 @@ public class Knob extends Region {
         }
 
         repaint();
+    }
+
+    /**
+     * calculate the dot product of two vectors
+     *
+     * @param a vector a
+     * @param b vector b
+     * @return dot product of both vectors
+     */
+    public static double dot(double[] a, double[] b) {
+        double product = 0;
+        final int n = Math.min(a.length, b.length);
+        for (int i = 0; i < n; i++) {
+            product = Math.fma(a[i], b[i], product);
+        }
+
+        return product;
+    }
+
+    /**
+     * calculate the length/magnitude of a vector
+     *
+     * @param vector vector whose magnitude to calculate
+     * @return vector length
+     */
+    public static double length(double... vector) {
+        return Math.sqrt(dot(vector, vector));
+    }
+
+    /**
+     * normalize a vector to a unit vector
+     *
+     * @param vector input vector
+     * @return unit vector
+     */
+    public static double[] normalize(double... vector) {
+        final double[] result = new double[vector.length];
+        final double length = length(vector);
+        for (int i = 0; i < result.length; i++) {
+            result[i] = vector[i] / length;
+        }
+        return result;
     }
 
     /**
