@@ -20,7 +20,6 @@ import java.util.List;
 
 /**
  * A custom JavaFX knob control themed closely to the JavaFX's Moderna
- * <p>
  */
 public class Knob extends Region {
     final Canvas canvas = new Canvas();
@@ -59,16 +58,24 @@ public class Knob extends Region {
         addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> updateRotationWithMouseEvent(e));
         addEventHandler(KeyEvent.KEY_PRESSED, e -> {
             switch (e.getCode()) {
-                case UP -> rotationProperty().set(rotationProperty().get() - (isSnapToTicks() ? tickSpacing.get() : 1));
-                case DOWN -> rotationProperty().set(rotationProperty().get() + (isSnapToTicks() ? tickSpacing.get() : 1));
+                case UP:
+                    rotationProperty().set(rotationProperty().get() - (isSnapToTicks() ? tickSpacing.get() : 1));
+                    break;
+                case DOWN:
+                    rotationProperty().set(rotationProperty().get() + (isSnapToTicks() ? tickSpacing.get() : 1));
+                    break;
 
             }
         });
         addEventHandler(ScrollEvent.ANY, e -> rotationProperty().set(rotationProperty().get() + (e.isShiftDown() ? e.getDeltaX() : e.getDeltaY()) * (isSnapToTicks() ? tickSpacing.get() : 1)));
 
-
         rotationProperty.addListener((observable, oldValue, newValue) -> checkRotation());
-        tickSpacing.addListener((observable, oldValue, newValue) -> updateSnapMarks());
+        tickSpacing.addListener((observable, oldValue, newValue) -> {
+            if (oldValue.doubleValue() == newValue.doubleValue()) {
+                return;
+            }
+            updateSnapMarks();
+        });
         snapEnabled.addListener((observable, oldValue, newValue) -> repaint());
         tickMarksVisible.addListener((observable, oldValue, newValue) -> repaint());
 
@@ -104,7 +111,6 @@ public class Knob extends Region {
         final double[] currentVector = normalize(e.getX() - center[0], e.getY() - center[1]);
         final double angle = Math.atan2(currentVector[0], -currentVector[1]);
         rotationProperty.set(Math.toDegrees(angle >= 0 ? angle : Math.PI + Math.PI + angle));// atan2 of dot product and determinant of current vector verses up (0,-1). As x of up vector is 0, can simplify
-
     }
 
     /**
@@ -130,7 +136,6 @@ public class Knob extends Region {
             rotationProperty.set(tickSpacing.get() * (Math.round(getValue() / tickSpacing.get())));
 
         }
-
 
         repaint();
     }
@@ -195,12 +200,38 @@ public class Knob extends Region {
         this.rotationProperty.set(rotation);
     }
 
-
     /**
      * @return if the rotation is snapped to ticks
      */
     public boolean isSnapToTicks() {
         return snapEnabled.get();
+    }
+
+    /**
+     * set the number of degrees between tick marks
+     *
+     * @param spacing the degrees between tick marks
+     */
+    public void setTickSpacing(double spacing) {
+        tickSpacing.set(spacing);
+    }
+
+    /**
+     * set whether to snap to ticks
+     *
+     * @param enabled whether to snap to ticks
+     */
+    public void setSnapToTicks(boolean enabled) {
+        snapEnabled.set(enabled);
+    }
+
+    /**
+     * set whether to show tick marks
+     *
+     * @param visible whether to show tick marks
+     */
+    public void setShowTickMarks(boolean visible) {
+        tickMarksVisible.set(visible);
     }
 
     protected void repaint() {
@@ -246,32 +277,5 @@ public class Knob extends Region {
         gc.setFill(Color.grayRgb(102, opacity));
 
         gc.fillOval((x - positionIndicatorRadius), (y - positionIndicatorRadius), (positionIndicatorRadius * 2), (positionIndicatorRadius * 2));
-    }
-
-    /**
-     * set the number of degrees between tick marks
-     *
-     * @param spacing the degrees between tick marks
-     */
-    public void setTickSpacing(double spacing) {
-        tickSpacing.set(spacing);
-    }
-
-    /**
-     * set whether to snap to ticks
-     *
-     * @param enabled whether to snap to ticks
-     */
-    public void setSnapToTicks(boolean enabled) {
-        snapEnabled.set(enabled);
-    }
-
-    /**
-     * set whether to show tick marks
-     *
-     * @param visible whether to show tick marks
-     */
-    public void setShowTickMarks(boolean visible) {
-        tickMarksVisible.set(visible);
     }
 }

@@ -9,7 +9,7 @@ import javafx.stage.Stage;
 
 public class Test extends Application {
     @Override
-    public void start(Stage stage) throws Exception {
+    public void start(Stage stage) {
         final Knob knob = new Knob();
         final Parent root = new Group(knob);
         knob.rotationProperty().addListener((observable, oldValue, newValue) -> System.out.println(newValue.doubleValue()));
