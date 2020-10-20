@@ -64,7 +64,7 @@ public class Knob extends Region {
 
             }
         });
-        addEventHandler(ScrollEvent.ANY, e -> rotationProperty().set(rotationProperty().get() + (e.isShiftDown()?e.getDeltaX():e.getDeltaY()) * (isSnapToTicks() ? tickSpacing.get() : 1)));
+        addEventHandler(ScrollEvent.ANY, e -> rotationProperty().set(rotationProperty().get() + (e.isShiftDown() ? e.getDeltaX() : e.getDeltaY()) * (isSnapToTicks() ? tickSpacing.get() : 1)));
 
 
         rotationProperty.addListener((observable, oldValue, newValue) -> checkRotation());
@@ -248,15 +248,29 @@ public class Knob extends Region {
         gc.fillOval((x - positionIndicatorRadius), (y - positionIndicatorRadius), (positionIndicatorRadius * 2), (positionIndicatorRadius * 2));
     }
 
-
+    /**
+     * set the number of degrees between tick marks
+     *
+     * @param spacing the degrees between tick marks
+     */
     public void setTickSpacing(double spacing) {
         tickSpacing.set(spacing);
     }
 
+    /**
+     * set whether to snap to ticks
+     *
+     * @param enabled whether to snap to ticks
+     */
     public void setSnapToTicks(boolean enabled) {
         snapEnabled.set(enabled);
     }
 
+    /**
+     * set whether to show tick marks
+     *
+     * @param visible whether to show tick marks
+     */
     public void setShowTickMarks(boolean visible) {
         tickMarksVisible.set(visible);
     }
