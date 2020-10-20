@@ -1,19 +1,19 @@
 package qupath.lib.gui;
 
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleDoubleProperty;
+import javafx.beans.property.*;
+import javafx.geometry.Pos;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
-import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.LinearGradient;
 import javafx.scene.paint.Stop;
+import javafx.scene.text.Font;
+import javafx.scene.text.Text;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +21,7 @@ import java.util.List;
 /**
  * A custom JavaFX knob control themed closely to the JavaFX's Moderna
  */
-public class Knob extends Region {
+public class Knob extends StackPane {
     final Canvas canvas = new Canvas();
     final GraphicsContext gc = canvas.getGraphicsContext2D();
     private final double padding = 2;
@@ -29,15 +29,18 @@ public class Knob extends Region {
     private final double radius;
     private final BooleanProperty snapEnabled = new SimpleBooleanProperty(false);
     private final BooleanProperty tickMarksVisible = new SimpleBooleanProperty(false);
-
+    private final BooleanProperty showAngle = new SimpleBooleanProperty(false);
     private final DoubleProperty tickSpacing = new SimpleDoubleProperty(10);
+    private final ObjectProperty<Font> textFont = new SimpleObjectProperty<>(new Text().getFont());
+    private final Text angle = new Text("0.0\u00B0");
     private final double[] center;
     private final List<double[]> snapMarks = new ArrayList<>();
 
     public Knob(double diameter) {
-        getChildren().add(canvas);
+        getChildren().addAll(canvas, angle);
+        StackPane.setAlignment(canvas, Pos.CENTER);
+        StackPane.setAlignment(angle, Pos.CENTER);
         setFocusTraversable(true);
-        setFocused(true);
         this.radius = Math.max(10, diameter * .5);
         center = new double[]{padding + .5 * diameter, padding + .5 * diameter};
         canvas.setWidth(diameter + padding + padding);
@@ -68,7 +71,12 @@ public class Knob extends Region {
             }
         });
         addEventHandler(ScrollEvent.ANY, e -> rotationProperty().set(rotationProperty().get() + (e.isShiftDown() ? e.getDeltaX() : e.getDeltaY()) * (isSnapToTicks() ? tickSpacing.get() : 1)));
-
+        addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
+            final double[] vector = new double[]{e.getX() - center[0] - canvas.getLayoutX(), e.getY() - center[1] - canvas.getLayoutY()};
+            if (!focusedProperty().get() && dot(vector, vector) <= radius * radius) {
+                requestFocus();
+            }
+        });
         rotationProperty.addListener((observable, oldValue, newValue) -> checkRotation());
         tickSpacing.addListener((observable, oldValue, newValue) -> {
             if (oldValue.doubleValue() == newValue.doubleValue()) {
@@ -78,7 +86,10 @@ public class Knob extends Region {
         });
         snapEnabled.addListener((observable, oldValue, newValue) -> repaint());
         tickMarksVisible.addListener((observable, oldValue, newValue) -> repaint());
-
+        parentProperty().addListener((observable, oldValue, newValue) -> repaint());
+        styleProperty().addListener((observable, oldValue, newValue) -> repaint());
+        showAngle.addListener((observable, oldValue, newValue) -> angle.setVisible(newValue));
+        textFont.addListener((observable, oldValue, newValue) -> angle.setFont(newValue));
         updateSnapMarks();
     }
 
@@ -107,8 +118,7 @@ public class Knob extends Region {
         if (isDisabled()) {
             return;
         }
-
-        final double[] currentVector = normalize(e.getX() - center[0], e.getY() - center[1]);
+        final double[] currentVector = normalize(e.getX() - center[0] - canvas.getLayoutX(), e.getY() - center[1] - canvas.getLayoutY());
         final double angle = Math.atan2(currentVector[0], -currentVector[1]);
         rotationProperty.set(Math.toDegrees(angle >= 0 ? angle : Math.PI + Math.PI + angle));// atan2 of dot product and determinant of current vector verses up (0,-1). As x of up vector is 0, can simplify
     }
@@ -138,6 +148,7 @@ public class Knob extends Region {
         }
 
         repaint();
+        angle.setText(String.format("%.1f\u00B0", getValue()));
     }
 
     /**
@@ -234,9 +245,26 @@ public class Knob extends Region {
         tickMarksVisible.set(visible);
     }
 
+    /**
+     * set whether to display the angle
+     *
+     * @param visible whether to display the angle
+     */
+    public void setShowValue(boolean visible) {
+        showAngle.set(visible);
+    }
+
+    public void setValueFont(Font font) {
+        this.textFont.set(font);
+    }
+
     protected void repaint() {
         final double opacity = isDisabled() ? 0.4 : 1;
         gc.clearRect(0, 0, getWidth(), getHeight());
+        if (getScene() != null) {
+            System.out.println(this.lookup(".root"));
+
+        }
         gc.setFill(new LinearGradient(0, 0, 0, 1, true, CycleMethod.NO_CYCLE, new Stop(1, Color.grayRgb(207, opacity)),
                 new Stop(0, Color.grayRgb(237, opacity))));
         final double diameter = 2 * radius;
@@ -277,5 +305,6 @@ public class Knob extends Region {
         gc.setFill(Color.grayRgb(102, opacity));
 
         gc.fillOval((x - positionIndicatorRadius), (y - positionIndicatorRadius), (positionIndicatorRadius * 2), (positionIndicatorRadius * 2));
+
     }
 }
