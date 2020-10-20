@@ -142,7 +142,7 @@ public class Knob extends Region {
      * @param b vector b
      * @return dot product of both vectors
      */
-    public final static double dot(double[] a, double[] b) {
+    public static double dot(double[] a, double[] b) {
         double product = 0;
         final int n = Math.min(a.length, b.length);
         for (int i = 0; i < n; i++) {
