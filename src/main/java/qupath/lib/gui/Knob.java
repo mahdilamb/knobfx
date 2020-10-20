@@ -1,11 +1,15 @@
 package qupath.lib.gui;
 
+import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.ReadOnlyDoubleWrapper;
+import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.input.ScrollEvent;
+import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.CycleMethod;
 import javafx.scene.paint.LinearGradient;
@@ -17,26 +21,28 @@ import java.util.List;
 /**
  * A custom JavaFX knob control themed closely to the JavaFX's Moderna
  * <p>
- * Knob supports min and max range as well as snap to ticks. Note that if the min is set to 0 and max is set to 360, then knob is bounded at either end (unlike min and max both at 0)
  */
-public class Knob extends Canvas {
-
-    final GraphicsContext gc = getGraphicsContext2D();
+public class Knob extends Region {
+    final Canvas canvas = new Canvas();
+    final GraphicsContext gc = canvas.getGraphicsContext2D();
     private final double padding = 2;
     private final DoubleProperty rotationProperty = new SimpleDoubleProperty(0);
     private final double radius;
-    private final DoubleProperty snapTo = new SimpleDoubleProperty(0);
-    private DoubleProperty min = new SimpleDoubleProperty(0);
-    private DoubleProperty max = new SimpleDoubleProperty(360);
+    private final BooleanProperty snapEnabled = new SimpleBooleanProperty(false);
+    private final BooleanProperty tickMarksVisible = new SimpleBooleanProperty(false);
+
+    private final DoubleProperty tickSpacing = new SimpleDoubleProperty(10);
     private final double[] center;
-    private final double[] currentVector = new double[]{0, -1};
     private final List<double[]> snapMarks = new ArrayList<>();
 
     public Knob(double diameter) {
+        getChildren().add(canvas);
+        setFocusTraversable(true);
+        setFocused(true);
         this.radius = Math.max(10, diameter * .5);
         center = new double[]{padding + .5 * diameter, padding + .5 * diameter};
-        setWidth(diameter + padding + padding);
-        setHeight(getWidth());
+        canvas.setWidth(diameter + padding + padding);
+        canvas.setHeight(canvas.getWidth());
         disabledProperty().addListener((observable, oldValue, newValue) -> repaint());
         focusedProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue && !isDisabled()) {
@@ -50,24 +56,22 @@ public class Knob extends Canvas {
             }
         });
 
-        setOnMousePressed(e -> {
-            final double[] vector = new double[]{e.getX() - center[0], e.getY() - center[1]};
-            if (!focusedProperty().get() && dot(vector, vector) <= radius * radius) {
-                setFocused(true);
+        addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> updateRotationWithMouseEvent(e));
+        addEventHandler(KeyEvent.KEY_PRESSED, e -> {
+            switch (e.getCode()) {
+                case UP -> rotationProperty().set(rotationProperty().get() - (isSnapToTicks() ? tickSpacing.get() : 1));
+                case DOWN -> rotationProperty().set(rotationProperty().get() + (isSnapToTicks() ? tickSpacing.get() : 1));
+
             }
         });
+        addEventHandler(ScrollEvent.ANY, e -> rotationProperty().set(rotationProperty().get() + (e.isShiftDown()?e.getDeltaX():e.getDeltaY()) * (isSnapToTicks() ? tickSpacing.get() : 1)));
 
-        setOnMouseReleased(e -> {
-            final double[] vector = new double[]{e.getX() - center[0], e.getY() - center[1]};
-            if (focusedProperty().get() && dot(vector, vector) > radius * radius) {
-                setFocused(false);
-            }
 
-        });
-        setOnMouseDragged(e -> updateRotationWithMouseEvent(e));
-        setOnScroll(e -> rotationProperty().set(rotationProperty().get() + e.getDeltaY() * (isSnapToTicks() ? snapTo.get() : 1)));
-        rotationProperty.addListener((observable, oldValue, newValue) -> checkRotation(newValue.doubleValue()));
-        snapTo.addListener((observable, oldValue, newValue) -> updateSnapMarks());
+        rotationProperty.addListener((observable, oldValue, newValue) -> checkRotation());
+        tickSpacing.addListener((observable, oldValue, newValue) -> updateSnapMarks());
+        snapEnabled.addListener((observable, oldValue, newValue) -> repaint());
+        tickMarksVisible.addListener((observable, oldValue, newValue) -> repaint());
+
         updateSnapMarks();
     }
 
@@ -79,12 +83,11 @@ public class Knob extends Canvas {
     //keep a list of snap mark vectors so they don't need to be recalculated; Always calls repaint
     private void updateSnapMarks() {
         snapMarks.clear();
-        if (isSnapToTicks()) {
-            for (double i = 0; i < Math.PI * 2; i += snapTo.get()) {
-                snapMarks.add(new double[]{
-                        Math.sin(i), -Math.cos(i)
-                });
-            }
+        final double radians = Math.toRadians(tickSpacing.get());
+        for (double i = 0; i < Math.PI * 2; i += radians) {
+            snapMarks.add(new double[]{
+                    Math.sin(i), -Math.cos(i)
+            });
         }
 
         repaint();
@@ -98,7 +101,7 @@ public class Knob extends Canvas {
             return;
         }
 
-        System.arraycopy(normalize(e.getX() - center[0], e.getY() - center[1]), 0, currentVector, 0, 2);
+        final double[] currentVector = normalize(e.getX() - center[0], e.getY() - center[1]);
         final double angle = Math.atan2(currentVector[0], -currentVector[1]);
         rotationProperty.set(Math.toDegrees(angle >= 0 ? angle : Math.PI + Math.PI + angle));// atan2 of dot product and determinant of current vector verses up (0,-1). As x of up vector is 0, can simplify
 
@@ -107,39 +110,25 @@ public class Knob extends Canvas {
     /**
      * ensure that the rotation rules are followed (e.g. min, max, snaps, etc.)
      */
-    private void checkRotation(double rotation) {
-        if (snapTo.get() > 0) {
-            final double halfSnap = snapTo.get() * .5;
-            final double a = Math.abs(rotation);
-            if (a < halfSnap) {
-                currentVector[0] = 0;
-                currentVector[1] = -1;
+    private void checkRotation() {
+        if (getValue() < 0) {
+            rotationProperty.set(360 + (getValue() % 360));
+        }
+        if (getValue() > 360) {
+            rotationProperty.set(getValue() % 360);
+        }
+        if (isSnapToTicks()) {
+
+            final double halfSnap = tickSpacing.get() * .5;
+
+            if (getValue() < halfSnap || getValue() > 360 - halfSnap) {
                 rotationProperty.set(0);
-
-            } else if (a > 180 - halfSnap) {
-
-                currentVector[0] = 0;
-                currentVector[1] = 1;
-                rotationProperty.set(180);
             } else {
-                currentVector[0] = Math.sin(rotation);
-                currentVector[1] = -Math.cos(rotation);
-                rotationProperty.set(snapTo.get() * (Math.round(rotation / snapTo.get())));
-            }
 
-        } else {
-            if (max.doubleValue() != min.doubleValue()) {
-                if (getValue() < min.get()) {
-                    rotationProperty.set(min.get());
-                }
-                if (getValue() > max.get()) {
-                    rotationProperty.set(max.get());
-                }
-            } else {
-                currentVector[0] = Math.sin(rotation);
-                currentVector[1] = -Math.cos(rotation);
-                rotationProperty.set(rotation);
+                rotationProperty.set(tickSpacing.get() * (Math.round(getValue() / tickSpacing.get())));
             }
+            rotationProperty.set(tickSpacing.get() * (Math.round(getValue() / tickSpacing.get())));
+
         }
 
 
@@ -211,7 +200,7 @@ public class Knob extends Canvas {
      * @return if the rotation is snapped to ticks
      */
     public boolean isSnapToTicks() {
-        return snapTo.get() > 0;
+        return snapEnabled.get();
     }
 
     protected void repaint() {
@@ -233,24 +222,42 @@ public class Knob extends Canvas {
         }
 
         gc.strokeOval(padding, padding, diameter, diameter);
-
+        final double radians = Math.toRadians(rotationProperty.get());
+        final double[] currentVector = new double[]{
+                Math.sin(radians),
+                -Math.cos(radians)
+        };
         final double x = center[0] + (radius - positionIndicatorRadius - 5) * currentVector[0];
         final double y = center[1] + (radius - positionIndicatorRadius - 5) * currentVector[1];
         gc.setLineWidth(1);
+        if (tickMarksVisible.get()) {
+            gc.setStroke(Color.grayRgb(153, opacity));
 
-        gc.setStroke(Color.grayRgb(208, opacity));
-        gc.strokeOval((padding + positionIndicatorRadius + 5), (padding + positionIndicatorRadius + 5), (diameter - positionIndicatorDiameter - 10), (diameter - positionIndicatorDiameter - 10));
+            for (final double[] mark : snapMarks) {
+                final double x0 = center[0] + (radius - positionIndicatorRadius - 2) * mark[0];
+                final double y0 = center[1] + (radius - positionIndicatorRadius - 2) * mark[1];
+                final double x1 = center[0] + (radius - positionIndicatorDiameter) * mark[0];
+                final double y1 = center[1] + (radius - positionIndicatorDiameter) * mark[1];
+                gc.strokeLine(x0, y0, x1, y1);
 
-        for (final double[] mark : snapMarks) {
-            final double x0 = center[0] + (radius - positionIndicatorRadius - 2) * mark[0];
-            final double y0 = center[1] + (radius - positionIndicatorRadius - 2) * mark[1];
-            final double x1 = center[0] + (radius - positionIndicatorDiameter) * mark[0];
-            final double y1 = center[1] + (radius - positionIndicatorDiameter) * mark[1];
-            gc.strokeLine(x0, y0, x1, y1);
-
+            }
         }
+
         gc.setFill(Color.grayRgb(102, opacity));
 
         gc.fillOval((x - positionIndicatorRadius), (y - positionIndicatorRadius), (positionIndicatorRadius * 2), (positionIndicatorRadius * 2));
+    }
+
+
+    public void setTickSpacing(double spacing) {
+        tickSpacing.set(spacing);
+    }
+
+    public void setSnapToTicks(boolean enabled) {
+        snapEnabled.set(enabled);
+    }
+
+    public void setShowTickMarks(boolean visible) {
+        tickMarksVisible.set(visible);
     }
 }
