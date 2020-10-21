@@ -25,5 +25,5 @@ test {
 }
 javafx {
     version = "16-ea+2"
-    modules = ['javafx.base', 'javafx.graphics']
+    modules = ['javafx.base', 'javafx.graphics','javafx.controls']
 }
