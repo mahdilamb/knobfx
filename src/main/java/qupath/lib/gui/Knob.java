@@ -17,7 +17,7 @@ import javafx.scene.shape.Path;
 import javafx.scene.text.Text;
 
 /**
- * A custom JavaFX knob control themed closely to the JavaFX's Moderna
+ * A custom JavaFX knob control
  */
 public class Knob extends Control {
 
@@ -58,6 +58,15 @@ public class Knob extends Control {
         tickMarks.setVisible(false);
         //add event handlers
         outerCircle.addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> updateRotationWithMouseEvent(e));
+        outerCircle.addEventHandler(MouseEvent.MOUSE_CLICKED, e -> updateRotationWithMouseEvent(e));
+
+        outerCircle.addEventHandler(ScrollEvent.ANY, e -> rotationProperty().set(rotationProperty().get() + (e.isShiftDown() ? e.getDeltaX() : e.getDeltaY()) * (isSnapToTicks() ? getTickSpacing() : 1)));
+        outerCircle.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
+            final double[] vector = new double[]{e.getX() - outerCircle.getCenterX(), e.getY() - outerCircle.getCenterY()};
+            if (!focusedProperty().get() && dot(vector, vector) <= outerCircle.getRadius() * outerCircle.getRadius()) {
+                requestFocus();
+            }
+        });
         addEventHandler(KeyEvent.KEY_PRESSED, e -> {
             switch (e.getCode()) {
                 case LEFT:
@@ -69,13 +78,6 @@ public class Knob extends Control {
 
             }
         });
-        outerCircle.addEventHandler(ScrollEvent.ANY, e -> rotationProperty().set(rotationProperty().get() + (e.isShiftDown() ? e.getDeltaX() : e.getDeltaY()) * (isSnapToTicks() ? getTickSpacing() : 1)));
-        outerCircle.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
-            final double[] vector = new double[]{e.getX() - outerCircle.getCenterX(), e.getY() - outerCircle.getCenterY()};
-            if (!focusedProperty().get() && dot(vector, vector) <= outerCircle.getRadius() * outerCircle.getRadius()) {
-                requestFocus();
-            }
-        });
         rotationProperty.addListener((observable, oldValue, newValue) -> checkRotation());
         tickSpacing.addListener((observable, oldValue, newValue) -> {
             if (oldValue.doubleValue() == newValue.doubleValue()) {
@@ -83,7 +85,7 @@ public class Knob extends Control {
             }
             updateSnapMarks();
         });
-
+        setPrefSize(200, 200);
     }
 
 
@@ -114,7 +116,7 @@ public class Knob extends Control {
         if (isDisabled()) {
             return;
         }
-        final double[] currentVector = normalize(e.getX() - outerCircle.getCenterX() - getLayoutX(), e.getY() - outerCircle.getCenterY() - getLayoutY());
+        final double[] currentVector = normalize(e.getX() - outerCircle.getCenterX() , e.getY() - outerCircle.getCenterY());
         final double angle = Math.atan2(currentVector[0], -currentVector[1]);
         rotationProperty.set(Math.toDegrees(angle >= 0 ? angle : Math.PI + Math.PI + angle));// atan2 of dot product and determinant of current vector verses up (0,-1). As x of up vector is 0, can simplify
     }
